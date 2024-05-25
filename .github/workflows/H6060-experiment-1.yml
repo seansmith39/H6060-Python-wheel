@@ -1,0 +1,85 @@
+name: H6060 Experiment 1
+
+on:
+  push:
+
+jobs:
+  build-application:
+    name: Build Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5.1.0
+        with:
+          python-version: 3.12
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Build Dependency
+        shell: bash
+        run: pip install flit
+
+      - name: Build And Upload Python Package
+        uses: seansmith39/H6060-Experiment-Resources/.github/actions/python/python-build-upload@main
+        with:
+          build-command: flit build --setup-py
+          build-directory: dist
+
+  test-application:
+    name: Test Application
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5.1.0
+        with:
+          python-version: 3.12
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Project
+        shell: bash
+        run: |
+          pip install --no-binary=wheel .
+          pip install .[test] coverage[toml]
+          pip install build flit
+
+      - name: Run Tests With Coverage
+        shell: bash
+        env:
+          PYTHONWARNDEFAULTENCODING: 1
+        run: |
+          coverage run -m pytest -v
+          coverage xml
+
+      - name: Upload Coverage XML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          if-no-files-found: error
+
+  python-scanning:
+    name: Run SCA and SAST Python Scanning Workflow
+    uses: seansmith39/H6060-Experiment-Resources/.github/workflows/experiment-1-python.yml@main
+    needs: [ build-application, test-application]
+    secrets: inherit
+    with:
+      project-name: H6060-Python-wheel
+      coverage-filename: coverage.xml
+      sast-sonarqube-enabled: false
+      sast-deepsource-enabled: false
+      sast-codeql-enabled: false
+      sca-eclipse-steady-enabled: false
+      sca-snyk-enabled: false
+      sca-owasp-dependency-check-enabled: false
+      sca-grype-enabled: false
